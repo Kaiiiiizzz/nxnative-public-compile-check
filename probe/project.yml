@@ -1,0 +1,42 @@
+name: NXNativeProbe
+options:
+  deploymentTarget:
+    iOS: '26.0'
+targets:
+  NXNativeProbe:
+    type: application
+    platform: iOS
+    sources:
+      - Main.m
+      - Probe.metal
+    dependencies:
+      - sdk: UIKit.framework
+      - sdk: Metal.framework
+      - sdk: MetalKit.framework
+      - sdk: QuartzCore.framework
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: NXNative Probe
+        CFBundleShortVersionString: '1.0'
+        CFBundleVersion: '1'
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.nxnative.validation.probe
+        PRODUCT_NAME: NXNativeProbe
+        TARGETED_DEVICE_FAMILY: '1,2'
+        CLANG_ENABLE_OBJC_ARC: YES
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        GENERATE_INFOPLIST_FILE: NO
+schemes:
+  NXNativeProbe:
+    build:
+      targets:
+        NXNativeProbe: all

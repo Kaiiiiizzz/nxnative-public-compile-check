@@ -9,6 +9,8 @@ import subprocess
 import sys
 import tempfile
 import time
+import plistlib
+import zipfile
 
 PIN = '269d61ff974b2e8e073d7357466ae130c3f6812f'
 GAME = '0100F2C0115B6000'
@@ -22,7 +24,7 @@ def main():
     source, logs = args.source.resolve(), args.logs.resolve()
     steps = ['Verify pinned Git commit', 'Record Xcode and iPhoneOS SDK versions',
              'Check Metal compiler against upstream lock', 'Compile upstream iOS sources',
-             'Compile Windows UIKit front end with Apple clang', 'Compile synthetic Metal shader', 'Build and link unsigned app with synthetic modules']
+             'Compile Windows UIKit front end with Apple clang', 'Compile synthetic Metal shader', 'Build and link unsigned app with synthetic modules', 'Build original unsigned Metal probe']
     if args.plan:
         print(json.dumps({'commit': PIN, 'profile': GAME, 'steps': steps,
                           'uploads': ['diagnostic logs', 'results.json'], 'game_inputs': False}, indent=2))
@@ -41,10 +43,10 @@ def main():
         if key.startswith(('DM_', 'NXW_')) or key in ('GAME', 'PYTHONPATH', 'PYTHONHOME'):
             env.pop(key)
     env.update(DM_GAME=GAME, GAME=GAME)
-    def run(name, command, timeout=600, required=True):
+    def run(name, command, timeout=600, required=True, cwd=None):
         started = time.monotonic()
         try:
-            p = subprocess.run(command, cwd=source, env=env, stdout=subprocess.PIPE,
+            p = subprocess.run(command, cwd=cwd or source, env=env, stdout=subprocess.PIPE,
                                stderr=subprocess.STDOUT, text=True, errors='replace', timeout=timeout)
             code, output = p.returncode, p.stdout
         except (OSError, subprocess.TimeoutExpired) as exc:
@@ -86,6 +88,25 @@ def main():
             run('unsigned-app-smoke', [sys.executable, 'dm/ios/tools/build_smoke.py', '--output', str(smoke)], 600)
             executable = smoke / 'derived/Build/Products/Release-iphoneos/DmIOS.app/DmIOS'
             run('unsigned-mach-o-header', ['xcrun', 'otool', '-hv', str(executable)], 60)
+            probe = Path(__file__).resolve().parents[1] / 'probe'
+            run('probe-project', ['xcodegen', 'generate'], 60, cwd=probe)
+            derived = work / 'probe-derived'
+            run('probe-build', ['xcodebuild', '-project', str(probe / 'NXNativeProbe.xcodeproj'), '-scheme', 'NXNativeProbe', '-configuration', 'Release', '-destination', 'generic/platform=iOS', '-derivedDataPath', str(derived), '-jobs', '3', 'CODE_SIGNING_ALLOWED=NO', 'CODE_SIGNING_REQUIRED=NO', 'CODE_SIGN_IDENTITY=', 'build'])
+            app = derived / 'Build/Products/Release-iphoneos/NXNativeProbe.app'
+            info = plistlib.loads((app / 'Info.plist').read_bytes())
+            if info['CFBundleIdentifier'] != 'org.nxnative.validation.probe':
+                raise RuntimeError('Unexpected probe identifier')
+            if (app / '_CodeSignature').exists() or (app / 'embedded.mobileprovision').exists():
+                raise RuntimeError('Probe must be unsigned')
+            run('probe-mach-o-header', ['xcrun', 'otool', '-hv', str(app / info['CFBundleExecutable'])], 60)
+            output = logs.parent / 'probe-output'
+            output.mkdir(exist_ok=True)
+            with zipfile.ZipFile(output / 'NXNativeProbe-unsigned.ipa', 'w', zipfile.ZIP_DEFLATED) as archive:
+                for file in sorted(app.rglob('*')):
+                    if file.is_file():
+                        archive.write(file, 'Payload/NXNativeProbe.app/' + file.relative_to(app).as_posix())
+            (logs / 'probe-package.log').write_text('Original Metal triangle probe packaged unsigned. No game content; no signature or provisioning profile. Submitted frame rate is a probe statistic, not game performance.\n', encoding='utf-8')
+
     except (RuntimeError, ValueError) as exc:
         results.append({'name': 'summary', 'exit_code': 1, 'detail': str(exc)})
         record()

@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -21,7 +22,7 @@ def main():
     source, logs = args.source.resolve(), args.logs.resolve()
     steps = ['Verify pinned Git commit', 'Record Xcode and iPhoneOS SDK versions',
              'Check Metal compiler against upstream lock', 'Compile upstream iOS sources',
-             'Compile Windows UIKit front end with Apple clang', 'Compile synthetic Metal shader']
+             'Compile Windows UIKit front end with Apple clang', 'Compile synthetic Metal shader', 'Build and link unsigned app with synthetic modules']
     if args.plan:
         print(json.dumps({'commit': PIN, 'profile': GAME, 'steps': steps,
                           'uploads': ['diagnostic logs', 'results.json'], 'game_inputs': False}, indent=2))
@@ -78,6 +79,13 @@ def main():
             air, lib = work / 'smoke.air', work / 'smoke.metallib'
             run('metal-compile', ['xcrun', '--sdk', 'iphoneos', 'metal', '-c', '-mios-version-min=18.0', str(shader), '-o', str(air)], 120)
             run('metal-library', ['xcrun', '--sdk', 'iphoneos', 'metallib', str(air), '-o', str(lib)], 120)
+            if not shutil.which('xcodegen', path=env.get('PATH')):
+                run('install-xcodegen', ['brew', 'install', 'xcodegen'], 300)
+            run('xcodegen-version', ['xcodegen', '--version'], 60)
+            smoke = work / 'unsigned-app-smoke'
+            run('unsigned-app-smoke', [sys.executable, 'dm/ios/tools/build_smoke.py', '--output', str(smoke)], 600)
+            executable = smoke / 'derived/Build/Products/Release-iphoneos/DmIOS.app/DmIOS'
+            run('unsigned-mach-o-header', ['xcrun', 'otool', '-hv', str(executable)], 60)
     except (RuntimeError, ValueError) as exc:
         results.append({'name': 'summary', 'exit_code': 1, 'detail': str(exc)})
         record()

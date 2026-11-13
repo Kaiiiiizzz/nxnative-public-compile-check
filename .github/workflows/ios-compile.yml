@@ -1,0 +1,47 @@
+name: NXNative public-source iOS compile
+on:
+  workflow_dispatch:
+    inputs:
+      apple_terms_reviewed:
+        description: 'I have reviewed and can comply with the applicable Apple toolchain terms'
+        required: true
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: public-source-ios-check
+  cancel-in-progress: false
+jobs:
+  compile:
+    if: ${{ inputs.apple_terms_reviewed }}
+    runs-on: xcode-27
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
+      PYTHONUTF8: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Check out orchestration only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Check out pinned public source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: zenvyzenshiro/NXNativeWindows
+          ref: 269d61ff974b2e8e073d7357466ae130c3f6812f
+          path: source
+          persist-credentials: false
+      - name: Compile public source and synthetic shader
+        run: python3 scripts/run_checks.py --source source --logs logs
+      - name: Return diagnostic logs only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-source-ios-check-logs
+          path: |
+            logs/*.log
+            logs/results.json
+          retention-days: 7
+          if-no-files-found: warn

@@ -10,6 +10,6 @@ Only public source is checked out. No game paths, keys, user uploads or secrets 
 
 Use a public repository and the standard runner for the documented free compute tier. Private repositories, larger runners and artifact allowances can have separate charges; no paid service has been enabled. Logs expire after seven days. A 20-minute timeout bounds each manual run.
 
-Local verification: run scripts/run_checks.py --source ../NXNativeWindows --logs ../logs/cloud-check --plan. Execution is rejected outside macOS. Publishing and cloud execution have not happened because GitHub CLI is not authenticated.
+Local verification: run scripts/run_checks.py --source ../NXNativeWindows --logs ../logs/cloud-check --plan. Execution is rejected outside macOS. Cloud validation succeeded on 2026-11-13: https://github.com/Kaiiiiizzz/nxnative-public-compile-check/actions/runs/43368668895 . Upstream iOS compile: 180 sources, zero failures. Windows UIKit front end with Apple clang: 183 sources, zero failures. Synthetic Metal compile and library creation passed. The Windows Metal lock mismatch remains recorded as a non-required diagnostic.
 
 The pinned Windows branch locks the Windows Metal compiler. A Mac compiler mismatch is recorded as a non-required diagnostic for this source/synthetic-only check. The upstream lock is not changed and no game shader cache is built or declared compatible.

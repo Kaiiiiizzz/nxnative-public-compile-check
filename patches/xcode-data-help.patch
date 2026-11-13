@@ -1,0 +1,22 @@
+diff --git a/dm/ios/tools/gen_build.py b/dm/ios/tools/gen_build.py
+index a474902..8e328db 100644
+--- a/dm/ios/tools/gen_build.py
++++ b/dm/ios/tools/gen_build.py
+@@ -24,6 +24,11 @@ for toks in lines:
+         elif t.endswith(('.c', '.m', '.S')): srcs.append(os.path.normpath(os.path.join(host, t)))
+         i += 1
+ assert srcs, 'no source files in the compile command'
++# The Windows fork's shared iOS front end calls the split-data importer on both build paths.
++# These UIKit sources are not part of the Mac host Makefile, so include them explicitly.
++win_ios = os.path.normpath(os.path.join(host, '../../win/ios'))
++srcs += [os.path.join(win_ios, name) for name in ('DataHelp.m', 'nxw_unzip.c')]
++fws += [f for f in ('BackgroundTasks', 'UserNotifications') if f not in fws]
+ dup = sorted({s for s in srcs if srcs.count(s) > 1})
+ if dup: sys.exit('duplicate source files in the compile command (explicit Makefile entries overlapping a wildcard?): ' + ' '.join(dup))
+ os.makedirs(f'{gen}/src'); os.makedirs(f'{gen}/main')
+@@ -39,4 +44,4 @@ for s in srcs:
+     os.symlink(s, f'{gen}/src/{flat}')
+ print('HEADER_SEARCH_PATHS = $(inherited) ' + ' '.join(f'"{d}"' for d in incs + dirs))
+ print('OTHER_CFLAGS = $(inherited) ' + ' '.join(defs))
+-print('DM_FRAMEWORKS = ' + ' '.join(f'-framework {f}' for f in fws if f != 'Cocoa'))
++print('DM_FRAMEWORKS = ' + ' '.join(f'-framework {f}' for f in fws if f != 'Cocoa') + ' -lz')   # nxw_unzip.c uses zlib

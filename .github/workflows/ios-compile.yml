@@ -33,6 +33,12 @@ jobs:
           ref: 269d61ff974b2e8e073d7357466ae130c3f6812f
           path: source
           persist-credentials: false
+      - name: Apply reviewed Xcode source-list fix
+        working-directory: source
+        run: |
+          git apply --check ../patches/xcode-data-help.patch
+          git apply ../patches/xcode-data-help.patch
+          git diff --check
       - name: Compile public source and synthetic shader
         run: python3 scripts/run_checks.py --source source --logs logs
       - name: Return diagnostic logs only

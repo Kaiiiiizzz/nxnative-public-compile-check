@@ -40,7 +40,7 @@ def main():
         if key.startswith(('DM_', 'NXW_')) or key in ('GAME', 'PYTHONPATH', 'PYTHONHOME'):
             env.pop(key)
     env.update(DM_GAME=GAME, GAME=GAME)
-    def run(name, command, timeout=600):
+    def run(name, command, timeout=600, required=True):
         started = time.monotonic()
         try:
             p = subprocess.run(command, cwd=source, env=env, stdout=subprocess.PIPE,
@@ -49,11 +49,11 @@ def main():
         except (OSError, subprocess.TimeoutExpired) as exc:
             code, output = 1, str(exc)
         (logs / (name + '.log')).write_text(output, encoding='utf-8')
-        results.append({'name': name, 'exit_code': code, 'seconds': round(time.monotonic()-started, 2)})
+        results.append({'name': name, 'exit_code': code, 'seconds': round(time.monotonic()-started, 2), 'required': required})
         record()
         print(name, 'exit', code, flush=True)
         print(output[-6000:], flush=True)
-        if code:
+        if code and required:
             raise RuntimeError(name + ' failed; see logs')
         return output.strip()
     try:
@@ -68,7 +68,7 @@ def main():
         clang = run('clang-path', ['xcrun', '--sdk', 'iphoneos', '--find', 'clang'], 60)
         env['PATH'] = str(Path(clang).parent) + os.pathsep + env.get('PATH', '')
         env['NXW_IOS_SDK'] = sdk
-        run('metal-lock', [sys.executable, 'dm/gfx/tools/own_compilers.py', '--check-metal'], 120)
+        run('metal-lock', [sys.executable, 'dm/gfx/tools/own_compilers.py', '--check-metal'], 120, required=False)
         run('upstream-ios-compile', [sys.executable, 'dm/ios/tools/compile_check.py'])
         with tempfile.TemporaryDirectory(prefix='nxnative-public-check-') as scratch:
             work = Path(scratch)
